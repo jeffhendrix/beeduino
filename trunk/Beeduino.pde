@@ -39,7 +39,7 @@ Analog pins 1-3 are connected to load cells through an amplifier circuit.
 #include <vdrive2.h>
 #include <MAX6675.h>
 #include <string.h>
-#include "Wire.h"
+#include <Wire.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // Define BEE_DEBUG to produce verbose output to console
@@ -130,10 +130,10 @@ void make_filename(char* filename)
 // Weight functions: conversion routine for ADC value to an actual weight value
 //
 
-int ADC_to_weight_value(int ADC)
-{
-	return ADC;
-}
+//unsigned int ADC_to_weight_value(unsigned int ADC)
+//{
+//  return ADC;
+//}
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -163,9 +163,11 @@ void setup()
   Wire.begin();
   setDateDs1307(10,10,01,1,12,10,0);
   
+  pinMode(SENSORS_ENABLE_PIN,OUTPUT);
+  
   // power off sensors
   digitalWrite(SENSORS_ENABLE_PIN,1);
-  delay(1000);
+  delay(5000);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -199,11 +201,14 @@ unsigned int weight0, weight1, weight2;
 
 void read_sensors_and_log()
 {
+#ifdef BEE_DEBUG
+  Serial.println("Hello from read_sensors_and_log()");
+#endif
+  
   // power on sensors ///////////////////////////
   digitalWrite(SENSORS_ENABLE_PIN,0);
   delay(5000);
-  
-  
+
   
   // record audio ///////////////////////////////
 #ifdef BEE_DEBUG
@@ -248,7 +253,7 @@ void read_sensors_and_log()
 #endif
 
   weight0 = analogRead(1);
-  weight0 = ADC_to_weight_value(weight0);
+//  weight0 = ADC_to_weight_value(weight0);
 
 #ifdef BEE_DEBUG
   Serial.print("Done: ");
@@ -273,12 +278,9 @@ void read_sensors_and_log()
 #ifdef BEE_DEBUG
   Serial.print("Writing to file...");
   Serial.println(file);
-#endif BEE_DEBUG
-
-//  delay(8000);
+#endif
 
   usb_data_log.init();
-  delay(1000);
 
   usb_data_log.fopen(file);
   delay(1000);
@@ -316,7 +318,7 @@ void read_sensors_and_log()
   
   // close file
   usb_data_log.fclose(file);
-  delay(1000);
+  delay(2000);
 
 #ifdef BEE_DEBUG
   Serial.println("Done");
