@@ -52,12 +52,12 @@ Analog pins 1-3 are connected to load cells through an amplifier circuit.
 // Initial datetime used by Arduino to start the datetime-keeper chip (DS1307)
 //
 
-#define SETUP_TIMESET_YEAR 1990
+/*#define SETUP_TIMESET_YEAR 1990
 #define SETUP_TIMESET_MONTH 1
 #define SETUP_TIMESET_DAY 5
 #define SETUP_TIMESET_HOUR 12
 #define SETUP_TIMESET_MINUTE 0
-#define SETUP_TIMESET_SECOND 0
+#define SETUP_TIMESET_SECOND 0*/
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -100,29 +100,31 @@ void record();
 // DS1307 datetime functions and definitions
 //
 
-#define DS1307_I2C_ADDRESS 0x68  // This is the I2C address of the DS1307
+/*#define DS1307_I2C_ADDRESS 0x68  // This is the I2C address of the DS1307
 byte second, myminute, hour, dayOfWeek, dayOfMonth, month, year; // "temp" variables
 
 // sets the date
 void setDateDs1307(char iyear, char imonth, char idayOfMonth, char idayOfWeek, char ihour, char iminute, char isecond);
 
 // gets the datetime from DS1307 and stores it in above "temp" variables
-void getDateDs1307();
+void getDateDs1307();*/
 
 // creates a filename from the above "temp" variables (must call getDateDs1307 first for valid result)
 // placed here for ease-of-change
+int sequence_num=1;
 char file[16];
 void make_filename(char* filename)
 {
-  filename[0] = '0'+ month / 10;
-  filename[1] = '0'+ month % 10;
-  filename[2] = '0'+dayOfMonth / 10;
-  filename[3] = '0'+dayOfMonth % 10;
-  filename[4] = '0'+hour / 10;
-  filename[5] = '0'+hour % 10;
-  filename[6] = '0'+myminute / 10;
-  filename[7] = '0'+myminute % 10;
+  filename[0] = '0'+ sequence_num/10000000;
+  filename[1] = '0'+ (sequence_num%10000000)/1000000;
+  filename[2] = '0'+ (sequence_num%1000000)/100000;
+  filename[3] = '0'+(sequence_num%100000)/10000;
+  filename[4] = '0'+(sequence_num%10000)/1000;
+  filename[5] = '0'+(sequence_num%1000)/100;
+  filename[6] = '0'+(sequence_num%100)/10;
+  filename[7] = '0'+(sequence_num%10);
   filename[8] = '.'; filename[9] = 'T'; filename[10] = 'X'; filename[11] = 'T'; filename[12] = 0;
+  sequence_num+=1;
 }
 
 
@@ -135,12 +137,124 @@ void make_filename(char* filename)
 //  return ADC;
 //}
 
+///////////////////////////////////////////////////////////////////////////////
+// Float output routines
+//
+void fmtDouble(double val, byte precision, char *buf, unsigned bufLen = 0xffff);
+unsigned fmtUnsigned(unsigned long val, char *buf, unsigned bufLen = 0xffff, byte width = 0);
+
+//
+// Produce a formatted string in a buffer corresponding to the value provided.
+// If the 'width' parameter is non-zero, the value will be padded with leading
+// zeroes to achieve the specified width.  The number of characters added to
+// the buffer (not including the null termination) is returned.
+//
+unsigned
+fmtUnsigned(unsigned long val, char *buf, unsigned bufLen, byte width)
+{
+  if (!buf || !bufLen)
+    return(0);
+
+  // produce the digit string (backwards in the digit buffer)
+  char dbuf[10];
+  unsigned idx = 0;
+  while (idx < sizeof(dbuf))
+  {
+    dbuf[idx++] = (val % 10) + '0';
+    if ((val /= 10) == 0)
+      break;
+  }
+
+  // copy the optional leading zeroes and digits to the target buffer
+  unsigned len = 0;
+  byte padding = (width > idx) ? width - idx : 0;
+  char c = '0';
+  while ((--bufLen > 0) && (idx || padding))
+  {
+    if (padding)
+      padding--;
+    else
+      c = dbuf[--idx];
+    *buf++ = c;
+    len++;
+  }
+
+  // add the null termination
+  *buf = '\0';
+  return(len);
+}
+
+//
+// Format a floating point value with number of decimal places.
+// The 'precision' parameter is a number from 0 to 6 indicating the desired decimal places.
+// The 'buf' parameter points to a buffer to receive the formatted string.  This must be
+// sufficiently large to contain the resulting string.  The buffer's length may be
+// optionally specified.  If it is given, the maximum length of the generated string
+// will be one less than the specified value.
+//
+// example: fmtDouble(3.1415, 2, buf); // produces 3.14 (two decimal places)
+//
+void
+fmtDouble(double val, byte precision, char *buf, unsigned bufLen)
+{
+  if (!buf || !bufLen)
+    return;
+
+  // limit the precision to the maximum allowed value
+  const byte maxPrecision = 6;
+  if (precision > maxPrecision)
+    precision = maxPrecision;
+
+  if (--bufLen > 0)
+  {
+    // check for a negative value
+    if (val < 0.0)
+    {
+      val = -val;
+      *buf = '-';
+      bufLen--;
+    }
+
+    // compute the rounding factor and fractional multiplier
+    double roundingFactor = 0.5;
+    unsigned long mult = 1;
+    for (byte i = 0; i < precision; i++)
+    {
+      roundingFactor /= 10.0;
+      mult *= 10;
+    }
+
+    if (bufLen > 0)
+    {
+      // apply the rounding factor
+      val += roundingFactor;
+
+      // add the integral portion to the buffer
+      unsigned len = fmtUnsigned((unsigned long)val, buf, bufLen);
+      buf += len;
+      bufLen -= len;
+    }
+
+    // handle the fractional portion
+    if ((precision > 0) && (bufLen > 0))
+    {
+      *buf++ = '.';
+      if (--bufLen > 0)
+        buf += fmtUnsigned((unsigned long)((val - (unsigned long)val) * mult), buf, bufLen, precision);
+    }
+  }
+
+  // null-terminate the string
+  *buf = '\0';
+} 
+
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // Instantiate sensor classes
 //
 
-/*MAX6675 temp_sensor(MAX6675_CS,MAX6675_S0,MAX6675_SCK,0,0.0); // MAX6675 - pinout then fahrenheit (0) and no error compensation (0.0)*/
+MAX6675 temp_sensor(MAX6675_CS,MAX6675_S0,MAX6675_SCK,0,-10.0); // MAX6675 - pinout then fahrenheit (0) and no error compensation (0.0)
 VDRIVE2 usb_data_log(VDRIVE2_SCLK,VDRIVE2_CS,VDRIVE2_SDI,VDRIVE2_SDO);
 
 
@@ -160,8 +274,8 @@ void setup()
 #endif
 
   // DS1307 (Timekeeper) setup
-  Wire.begin();
-  setDateDs1307(10,10,01,1,12,10,0);
+//  Wire.begin();
+//  setDateDs1307(10,10,01,1,12,10,0);
   
   pinMode(SENSORS_ENABLE_PIN,OUTPUT);
   
@@ -226,7 +340,7 @@ void read_sensors_and_log()
 
 
   // record temperature /////////////////////////
-/* Commented out b/c we can't test with MAX6675 until it's on the board
+/* Commented out b/c we can't test with MAX6675 until it's on the board */
 #ifdef BEE_DEBUG
   Serial.println("Recording temperature...");
 #endif
@@ -243,7 +357,6 @@ void read_sensors_and_log()
   Serial.print("Done: T(F)=");
   Serial.println( temperature );
 #endif
-*/
 
 
 
@@ -252,7 +365,7 @@ void read_sensors_and_log()
   Serial.println("Recording weight...");
 #endif
 
-  weight0 = analogRead(1);
+  weight0 = analogRead(2);
 //  weight0 = ADC_to_weight_value(weight0);
 
 #ifdef BEE_DEBUG
@@ -266,7 +379,7 @@ void read_sensors_and_log()
   Serial.println("Gathering date-time...");
 #endif
 
-  getDateDs1307();
+//  getDateDs1307();
   make_filename(file);
 
 #ifdef BEE_DEBUG
@@ -296,6 +409,10 @@ void read_sensors_and_log()
   delay(10);
   
   // TODO: output temperature (which is a float value)
+  char float_point[10];
+  fmtDouble(temperature,2,float_point,10);
+  usb_data_log.fputs(float_point);
+  usb_data_log.fputs("\n");
   
   
   // output audio
@@ -332,7 +449,7 @@ void read_sensors_and_log()
 ///////////////////////////////////////////////////////////////////////////////
 // DS1307 datetime functions
 //
-
+/*
 // Convert normal decimal numbers to binary coded decimal
 byte decToBcd(byte val)
 {
@@ -396,7 +513,7 @@ void getDateDs1307()
   month      = bcdToDec(Wire.receive());
   year       = bcdToDec(Wire.receive());
 }
-
+*/
 ///////////////////////////////////////////////////////////////////////////////
 // Audio definitions and functions
 //
