@@ -40,12 +40,14 @@ Analog pins 1-3 are connected to load cells through an amplifier circuit.
 #include <MAX6675.h>
 #include <string.h>
 #include <Wire.h>
+#include "HardwareSerial.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // Define BEE_DEBUG to produce verbose output to console
 // Note: _DO NOT_ define BEE_DEBUG if using digital pins 0/1 for something else (e.g., cell phone)
 
-#define BEE_DEBUG
+//#define BEE_DEBUG
+#define BEE_CELLPHONE
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -273,6 +275,28 @@ void setup()
   Serial.println("Hello from setup()");
 #endif
 
+#ifdef BEE_CELLPHONE
+  Serial.begin(4800);
+  Serial.println("AT");
+  delay(500);
+  Serial.println("AT");
+  delay(500);
+  Serial.println("ATE0");
+  delay(500);
+  Serial.println("ATE0");
+  delay(500);
+  Serial.println("AT+CMGF=1");
+  delay(500);
+  Serial.println("AT+CMGF=1");
+  delay(500);
+  Serial.println("AT+CPMS=\"SM\"");
+  delay(2000);
+  Serial.println("AT+CPMS=\"SM\"");
+  delay(2000);
+// inString = "";
+ Serial.flush();
+#endif
+
   // DS1307 (Timekeeper) setup
 //  Wire.begin();
 //  setDateDs1307(10,10,01,1,12,10,0);
@@ -292,7 +316,7 @@ void setup()
 void loop()
 {
   read_sensors_and_log();
-  delay(60000);
+  delay(15000);
 }
 
 
@@ -365,7 +389,9 @@ void read_sensors_and_log()
   Serial.println("Recording weight...");
 #endif
 
-  weight0 = analogRead(2);
+  for(int i=0; i<10; i++)
+    weight0 += analogRead(2);
+  weight0 /= 10;
 //  weight0 = ADC_to_weight_value(weight0);
 
 #ifdef BEE_DEBUG
@@ -386,7 +412,7 @@ void read_sensors_and_log()
   Serial.print("Done: ");
   Serial.println(file);
 #endif
-  
+ /* 
   // write gathered data to file on USB drive /////////
 #ifdef BEE_DEBUG
   Serial.print("Writing to file...");
@@ -439,11 +465,28 @@ void read_sensors_and_log()
 
 #ifdef BEE_DEBUG
   Serial.println("Done");
-#endif
+#endif*/
 
   // done -- power down sensors ///////////////////////////
   digitalWrite(SENSORS_ENABLE_PIN,1);
   delay(1000);
+  
+#ifdef BEE_CELLPHONE
+  Serial.println("AT");
+  delay(1000);
+  Serial.println("AT+CMGS=\"+12817021483\"");
+  delay(1000);
+  char float_point[10];
+  fmtDouble(temperature,2,float_point,10);
+//  Serial.print("Arduino says \"ruff! ruff!\"");
+  Serial.print("T=");
+  Serial.print(float_point);
+  Serial.print("   ");
+  Serial.print("Weight=");
+  Serial.print(weight0);
+  delay(500);
+  Serial.print(26, BYTE);  
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
