@@ -1,0 +1,1 @@
+Designed for an Arduino Duemilanove. Uses a FTDI VDRIVE2 Development Module to log data. Sensors include thermocouple, audio, and weight. Uses SoftwareSerial to connect to an AT-compatible cell phone for SMS connectivity. Can trigger alerts based off value of sensors.
